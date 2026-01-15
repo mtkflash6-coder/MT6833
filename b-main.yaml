@@ -1,0 +1,38 @@
+name: NetHunter Auto-Fork Build
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source (Android 11)
+        uses: actions/checkout@v4
+        with:
+          ref: android-11
+
+      - name: Setup Compiler (Clang 11)
+        run: |
+          sudo apt update && sudo apt install -y bc build-essential libelf-dev clang lld llvm gcc-aarch64-linux-gnu
+          # Clang 11.0.1 এর জন্য নির্দিষ্ট এনভায়রনমেন্ট সেট করা
+
+      - name: Apply NetHunter Patches
+        run: |
+          rm -rf drivers/staging/rtl8188eu
+          git clone https://github.com/aircrack-ng/rtl8188eus.git drivers/staging/rtl8188eu
+          echo "CONFIG_USB_CONFIGFS_F_HID=y" >> arch/arm64/configs/mt6833_defconfig
+          echo "CONFIG_RTL8188EU=m" >> arch/arm64/configs/mt6833_defconfig
+
+      - name: Run Build
+        run: |
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          make O=out mt6833_defconfig
+          make O=out -j$(nproc) Image.gz modules
+
+      - name: Export Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetHunter-Auto-Fork-A11
+          path: |
+            out/arch/arm64/boot/Image.gz
+            out/drivers/staging/rtl8188eu/8188eu.ko
